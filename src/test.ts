@@ -97,35 +97,52 @@ export class TestService {
   private async generateTestSuiteForFile(diff: any): Promise<TestSuite | null> {
     try {
       const prompt = `
-Analyze the following code changes and generate test scenarios in a simple table format:
+You are a test case generator. Analyze the following code changes and generate test scenarios.
 
 File: ${diff.file}
-Changes: ${diff.changes}
+Changes:
+${diff.changes.slice(0, 2000)}
 
-Generate test scenarios that include:
+Generate at least 3-5 test scenarios covering:
 1. Basic functionality tests
 2. Edge cases and boundary conditions  
 3. Error handling scenarios
 4. Different input variations
 
-Respond with a JSON object containing:
+IMPORTANT: Respond ONLY with a valid JSON object in this exact format:
 {
-  "fileName": "original_file_name",
+  "fileName": "${diff.file}",
   "functionName": "main_function_or_class_name",
   "testCases": [
     {
-      "scenario": "Clear description of what is being tested",
-      "input": "The input data or user action",
-      "expectedOutput": "The expected result or behavior"
+      "scenario": "Test basic functionality with valid input",
+      "input": "sample input value",
+      "expectedOutput": "expected result"
+    },
+    {
+      "scenario": "Test with empty input",
+      "input": "empty string",
+      "expectedOutput": "error message or default value"
+    },
+    {
+      "scenario": "Test with edge case",
+      "input": "boundary value",
+      "expectedOutput": "expected behavior"
     }
   ]
 }
 
-Focus on practical test scenarios that cover the functionality. Keep descriptions clear and concise.
+Do not include any explanation, only return the JSON object. Must have at least 3 test cases.
 `
 
       const response = await this.ai.generateTestCases(prompt)
       const testSuite = JSON.parse(response) as TestSuite
+
+      // Validate the response has test cases
+      if (!testSuite.testCases || !Array.isArray(testSuite.testCases) || testSuite.testCases.length === 0) {
+        console.error(`AI returned empty test cases for ${diff.file}`)
+        return null
+      }
 
       return testSuite
     } catch (error) {
@@ -147,6 +164,10 @@ Focus on practical test scenarios that cover the functionality. Keep description
   }
 
   private generateTestFileName(originalFile: string, commitHash: string): string {
+    if (!originalFile || typeof originalFile !== 'string') {
+      return `test_${commitHash.substring(0, 7)}.txt`
+    }
+    
     const baseName = path.basename(originalFile, path.extname(originalFile))
     const shortHash = commitHash.substring(0, 7)
 
@@ -179,12 +200,20 @@ Focus on practical test scenarios that cover the functionality. Keep description
   }
 
   private generateTestFileContent(testSuite: TestSuite, commitInfo: CommitInfo): string {
-    let content = `TEST SCENARIOS FOR: ${testSuite.fileName}\n`
+    let content = `TEST SCENARIOS FOR: ${testSuite.fileName || 'Unknown File'}\n`
     content += `=`.repeat(50) + `\n\n`
     content += `Commit: ${commitInfo.hash}\n`
     content += `Message: ${commitInfo.message}\n`
     content += `Generated: ${new Date().toISOString()}\n`
     content += `Function/Feature: ${testSuite.functionName || "Main functionality"}\n\n`
+
+    // Ensure testCases is an array
+    const testCases = Array.isArray(testSuite.testCases) ? testSuite.testCases : []
+    
+    if (testCases.length === 0) {
+      content += `No test cases generated.\n`
+      return content
+    }
 
     content += `TEST CASES:\n`
     content += `=`.repeat(50) + `\n\n`
@@ -194,10 +223,10 @@ Focus on practical test scenarios that cover the functionality. Keep description
     content += `|----------------------------------|----------------------------------|----------------------------------|\n`
 
     // Add test cases as table rows
-    testSuite.testCases.forEach((testCase, index) => {
+    testCases.forEach((testCase, index) => {
       const scenario = this.truncateText(testCase.scenario || `Test ${index + 1}`, 30)
-      const input = this.truncateText(String(testCase.input), 30)
-      const output = this.truncateText(String(testCase.expectedOutput), 30)
+      const input = this.truncateText(String(testCase.input || ''), 30)
+      const output = this.truncateText(String(testCase.expectedOutput || ''), 30)
 
       content += `| ${scenario.padEnd(32)} | ${input.padEnd(32)} | ${output.padEnd(32)} |\n`
     })
@@ -206,10 +235,10 @@ Focus on practical test scenarios that cover the functionality. Keep description
     content += `=`.repeat(50) + `\n\n`
 
     // Add detailed descriptions
-    testSuite.testCases.forEach((testCase, index) => {
+    testCases.forEach((testCase, index) => {
       content += `${index + 1}. ${testCase.scenario || `Test ${index + 1}`}\n`
-      content += `   Input: ${testCase.input}\n`
-      content += `   Expected: ${testCase.expectedOutput}\n\n`
+      content += `   Input: ${testCase.input || 'N/A'}\n`
+      content += `   Expected: ${testCase.expectedOutput || 'N/A'}\n\n`
     })
 
     return content

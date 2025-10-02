@@ -25,7 +25,25 @@ program
   .option("--duplicate", "Find similar logic that appears multiple times across commits")
   .option("--review", "AI-powered code review with suggestions and issue detection")
   .option("--log [count]", "Generate CHANGELOG.md from recent commits (e.g., --log 5 for last 5 commits)")
+  .addHelpText('after', `
+Examples:
+  $ fynn --add --ask          Stage changes and generate commit with confirmation
+  $ fynn --push               Generate commit and push to remote
+  $ fynn --dry-run            Preview commit message without committing
+  $ fynn --test               Generate test cases for latest commit
+  $ fynn --review             Get AI code review of latest commit
+  $ fynn --log 10             Generate changelog from last 10 commits
+  $ fynn setup                Setup OpenAI API key
+
+For more information, visit: https://github.com/yourusername/fynn
+`)
   .action(async (options) => {
+    // Show help if no options provided
+    const hasOptions = Object.keys(options).length > 0
+    if (!hasOptions) {
+      program.help()
+      return
+    }
     const spinner = ora("Initializing...").start()
 
     try {
@@ -34,6 +52,18 @@ program
       // Check if we're in a git repository
       if (!(await git.isGitRepository())) {
         spinner.fail("Not a git repository")
+        process.exit(1)
+      }
+
+      // Check if API key is required for this operation
+      const requiresApiKey = options.test || options.summary || options.duplicate || options.review || options.log !== undefined || options.push || (!options.impact && !options.report)
+      
+      if (requiresApiKey && !process.env.OPENAI_API_KEY) {
+        spinner.fail("OpenAI API key not found")
+        console.log(chalk.yellow("\n💡 To use this feature, you need to set up your OpenAI API key"))
+        console.log(chalk.cyan("\nRun: ") + chalk.white("fynn setup") + chalk.cyan(" for instructions"))
+        console.log(chalk.gray("\nOr set it directly:"))
+        console.log(chalk.gray("  export OPENAI_API_KEY='your-api-key-here'"))
         process.exit(1)
       }
 
@@ -152,6 +182,12 @@ program
         spinner.text = "Performing AI code review..."
         const ai = new AIService()
         const review = await ai.performCodeReview()
+
+        if (!review) {
+          spinner.fail("No commits found to review")
+          console.log(chalk.yellow("💡 Make at least one commit before running code review"))
+          process.exit(1)
+        }
 
         if (review) {
           spinner.succeed("Code review complete!")

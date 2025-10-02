@@ -266,7 +266,7 @@ Provide:
 - Improvement suggestions
 - Examples where helpful
 
-Respond with JSON:
+IMPORTANT: Respond ONLY with a valid JSON object (not an array). Use this exact structure:
 {
   "overallScore": 8,
   "issues": [
@@ -288,7 +288,14 @@ Respond with JSON:
   ]
 }
 
-Focus on actionable feedback. If code is good, say so with fewer issues.
+If no issues found, return:
+{
+  "overallScore": 9,
+  "issues": [],
+  "suggestions": []
+}
+
+Focus on actionable feedback. Must be a JSON object, not an array.
 `
 
       const { text } = await generateText({
@@ -298,7 +305,13 @@ Focus on actionable feedback. If code is good, say so with fewer issues.
       })
 
       const cleanedText = this.cleanJsonResponse(text)
-      return JSON.parse(cleanedText) as CodeReview
+      
+      try {
+        return JSON.parse(cleanedText) as CodeReview
+      } catch (parseError) {
+        console.error("Failed to parse AI response. Raw response:", cleanedText.substring(0, 200))
+        throw new Error("AI returned invalid response format. Please try again.")
+      }
     } catch (error) {
       console.error("Code review failed:", error)
       return null
@@ -445,37 +458,62 @@ Parse commit messages using conventional commit format. Group similar changes. K
       cleaned = cleaned.replace(/\s*```$/, "")
     }
 
-    // Try to extract JSON object from conversational text
-    const jsonObjectMatch = cleaned.match(/\{[\s\S]*\}/)
-    // Try to extract JSON array from conversational text
-    const jsonArrayMatch = cleaned.match(/\[[\s\S]*\]/)
+    cleaned = cleaned.trim()
 
-    if (jsonArrayMatch) {
-      cleaned = jsonArrayMatch[0]
-    } else if (jsonObjectMatch) {
-      cleaned = jsonObjectMatch[0]
-    }
-
-    // Find the first { or [ and corresponding closing bracket
+    // Find the first { or [ and corresponding closing bracket using proper bracket matching
     const firstBrace = cleaned.indexOf("{")
     const firstBracket = cleaned.indexOf("[")
-    const lastBrace = cleaned.lastIndexOf("}")
-    const lastBracket = cleaned.lastIndexOf("]")
-
+    
     // Determine if we're dealing with an object or array
-    if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
-      // It's an array
-      if (lastBracket !== -1 && lastBracket > firstBracket) {
-        cleaned = cleaned.substring(firstBracket, lastBracket + 1)
-      }
-    } else if (firstBrace !== -1) {
-      // It's an object
-      if (lastBrace !== -1 && lastBrace > firstBrace) {
-        cleaned = cleaned.substring(firstBrace, lastBrace + 1)
-      }
+    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+      // It's an object - find matching closing brace
+      const extracted = this.extractBalancedJson(cleaned, firstBrace, '{', '}')
+      if (extracted) return extracted
+    } else if (firstBracket !== -1) {
+      // It's an array - find matching closing bracket
+      const extracted = this.extractBalancedJson(cleaned, firstBracket, '[', ']')
+      if (extracted) return extracted
     }
 
     return cleaned.trim()
+  }
+
+  private extractBalancedJson(text: string, startIdx: number, openChar: string, closeChar: string): string | null {
+    let depth = 0
+    let inString = false
+    let escapeNext = false
+
+    for (let i = startIdx; i < text.length; i++) {
+      const char = text[i]
+
+      if (escapeNext) {
+        escapeNext = false
+        continue
+      }
+
+      if (char === '\\') {
+        escapeNext = true
+        continue
+      }
+
+      if (char === '"') {
+        inString = !inString
+        continue
+      }
+
+      if (!inString) {
+        if (char === openChar) {
+          depth++
+        } else if (char === closeChar) {
+          depth--
+          if (depth === 0) {
+            return text.substring(startIdx, i + 1)
+          }
+        }
+      }
+    }
+
+    return null
   }
 
   private incrementVersion(currentVersion: string): string {
