@@ -14,7 +14,7 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": ["git", "commit", "ai", "conventional-commits", "cli"],
-  "author": "Niraj Kshirsagar",
+  "author": "Niraj Kshirsagar <nirajkshirsagar72@gmail.com>",
   "license": "MIT",
   "dependencies": {
     "commander": "^11.1.0",

@@ -37,8 +37,6 @@ export class GitService {
       return { success: true }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error"
-
-      // Check if it's an upstream branch error
       if (errorMessage.includes("no upstream branch") || errorMessage.includes("set-upstream")) {
         const currentBranch = await this.getCurrentBranch()
         return {
@@ -88,7 +86,6 @@ export class GitService {
           changes: diff,
         })
       } catch (error) {
-        // Handle binary files or other diff errors
         diffs.push({
           file,
           insertions: 0,
@@ -121,11 +118,9 @@ export class GitService {
 
   async hasCommitsToPush(): Promise<boolean> {
     try {
-      // Check if there are commits ahead of the remote branch
       const status = await this.git.status()
       return status.ahead > 0
     } catch {
-      // If we can't determine status, assume no commits to push
       return false
     }
   }
@@ -158,8 +153,6 @@ export class GitService {
       if (!latestHash) {
         throw new Error("Unable to get latest commit hash")
       }
-
-      // Get diff between latest commit and its parent (or initial commit)
       const parentHash = log.all.length > 1 ? log.all[1].hash : null
 
       const diffCommand = parentHash ? [parentHash, latestHash] : [latestHash]
@@ -171,8 +164,6 @@ export class GitService {
       for (const fileStat of stats.files) {
         const insertions = "insertions" in fileStat ? fileStat.insertions : 0
         const deletions = "deletions" in fileStat ? fileStat.deletions : 0
-
-        // Get specific file diff
         const fileDiff = await this.git.diff([...diffCommand, "--", fileStat.file])
 
         diffs.push({
@@ -204,8 +195,6 @@ export class GitService {
 
       for (const diff of diffs) {
         totalChanges += diff.insertions + diff.deletions
-
-        // Check for critical file types
         const fileName = diff.file.toLowerCase()
         if (
           fileName.includes("config") ||
@@ -218,35 +207,23 @@ export class GitService {
           criticalFiles++
           complexityFactors += 2
         }
-
-        // Check for large changes
         if (diff.insertions + diff.deletions > 100) {
           complexityFactors += 1
         }
-
-        // Check for new files
         if (diff.changes.includes("new file mode")) {
           complexityFactors += 1
         }
-
-        // Check for deleted files
         if (diff.changes.includes("deleted file mode")) {
           complexityFactors += 2
         }
       }
-
-      // Calculate complexity score (0-10)
       const complexityScore = Math.min(10, Math.floor(totalChanges / 50 + filesTouched / 5 + complexityFactors))
-
-      // Determine risk level
       let riskLevel: "Low" | "Medium" | "High" = "Low"
       if (complexityScore >= 7 || criticalFiles > 0) {
         riskLevel = "High"
       } else if (complexityScore >= 4 || filesTouched > 5) {
         riskLevel = "Medium"
       }
-
-      // Generate details
       const details = [
         `${totalChanges} total line changes`,
         criticalFiles > 0 ? `${criticalFiles} critical files affected` : null,
@@ -270,8 +247,6 @@ export class GitService {
   async generateDeveloperReport(): Promise<DeveloperReport[]> {
     try {
       console.log("⏳ Analyzing repository history...")
-
-      // Get all commits with author and file information
       const log = await this.git.log({ format: { hash: "%H", author: "%an", files: "%s" } })
 
       if (log.all.length === 0) {
@@ -279,11 +254,7 @@ export class GitService {
       }
 
       console.log(`📊 Processing ${log.all.length} commits...`)
-
-      // Track author statistics
       const authorStats = new Map<string, { commits: number; files: Set<string> }>()
-
-      // Process each commit to gather statistics
       let processedCommits = 0
       for (const commit of log.all) {
         const author = commit.author
@@ -294,15 +265,12 @@ export class GitService {
 
         const stats = authorStats.get(author)!
         stats.commits++
-
-        // Get files changed in this commit
         try {
           const commitDiff = await this.git.show([commit.hash, "--name-only", "--format="])
           const files = commitDiff.split("\n").filter((file) => file.trim() !== "")
 
           files.forEach((file) => stats.files.add(file))
         } catch (error) {
-          // Skip if unable to get file info for this commit
         }
 
         processedCommits++
@@ -312,15 +280,10 @@ export class GitService {
       }
 
       console.log("🔍 Identifying developer hotspots...")
-
-      // Generate hotspots for each author (most frequently modified files)
       const reports: DeveloperReport[] = []
 
       for (const [author, stats] of authorStats.entries()) {
-        // Get file modification frequency for this author
         const fileFrequency = new Map<string, number>()
-
-        // Count how many times each file was modified by this author
         for (const commit of log.all) {
           if (commit.author === author) {
             try {
@@ -331,15 +294,12 @@ export class GitService {
                 fileFrequency.set(file, (fileFrequency.get(file) || 0) + 1)
               })
             } catch (error) {
-              // Skip if unable to get file info
             }
           }
         }
 
         const filteredFiles = Array.from(fileFrequency.entries()).filter(([file]) => {
           const fileName = file.toLowerCase()
-
-          // Exclude config, lock, and route files
           const excludePatterns = [
             "package-lock.json",
             "pnpm-lock.yaml",
@@ -365,13 +325,10 @@ export class GitService {
 
           return !excludePatterns.some((pattern) => fileName.includes(pattern))
         })
-
-        // Get top 3 hotspots (most frequently modified relevant files)
         const hotspots = filteredFiles
           .sort((a, b) => b[1] - a[1])
           .slice(0, 3)
           .map(([file]) => {
-            // Clean up file paths for better readability
             return file.replace(/^(src\/|app\/|components\/|pages\/|lib\/|utils\/)?/, "")
           })
 
@@ -382,8 +339,6 @@ export class GitService {
           hotspots: hotspots.length > 0 ? hotspots : ["No relevant files tracked"],
         })
       }
-
-      // Sort by commit count (descending)
       return reports.sort((a, b) => b.commits - a.commits)
     } catch (error) {
       return []
@@ -397,7 +352,6 @@ export class GitService {
 
       for (const commit of log.all) {
         try {
-          // Get diff for this commit
           const parentHash = commit.refs ? null : await this.getParentCommit(commit.hash)
           const diffCommand = parentHash ? [parentHash, commit.hash] : [commit.hash]
 
@@ -425,7 +379,6 @@ export class GitService {
             diffs,
           })
         } catch (error) {
-          // Skip commits that can't be processed
           continue
         }
       }
@@ -445,11 +398,8 @@ export class GitService {
       }
 
       if (since) {
-        // Use 'from' instead of 'since' for simple-git compatibility
         options.from = since
       }
-
-      // Default to last 10 commits if no options provided
       if (!count && !since) {
         options.maxCount = 10
       }

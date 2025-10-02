@@ -15,7 +15,6 @@ export class TestService {
 
   async generateTestsForCommit(): Promise<{ success: boolean; message: string; location?: string }> {
     try {
-      // Check if there are any commits
       const hasCommits = await this.git.hasCommits()
       if (!hasCommits) {
         return {
@@ -23,8 +22,6 @@ export class TestService {
           message: "No commits found. Please commit your changes first to generate tests.",
         }
       }
-
-      // Get the latest commit diff
       const latestCommitDiff = await this.git.getLatestCommitDiff()
       if (!latestCommitDiff || latestCommitDiff.length === 0) {
         return {
@@ -32,11 +29,7 @@ export class TestService {
           message: "No changes found in the latest commit.",
         }
       }
-
-      // Get commit info for naming
       const commitInfo = await this.git.getLatestCommitInfo()
-
-      // Generate test suites for each changed file
       const testSuites: TestSuite[] = []
 
       for (const diff of latestCommitDiff) {
@@ -54,8 +47,6 @@ export class TestService {
           message: "No testable code changes found in the latest commit.",
         }
       }
-
-      // Create Test directory and save test files
       const testDir = await this.createTestDirectory()
       const savedFiles: string[] = []
 
@@ -84,12 +75,8 @@ export class TestService {
   private shouldGenerateTestsForFile(fileName: string): boolean {
     const testableExtensions = [".js", ".ts", ".py", ".java", ".cpp", ".c", ".go", ".rs", ".php"]
     const excludePatterns = ["/test/", "/tests/", ".test.", ".spec.", "/node_modules/", "/dist/", "/build/"]
-
-    // Check if file has testable extension
     const hasTestableExtension = testableExtensions.some((ext) => fileName.endsWith(ext))
     if (!hasTestableExtension) return false
-
-    // Exclude test files and common build directories
     const isExcluded = excludePatterns.some((pattern) => fileName.includes(pattern))
     return !isExcluded
   }
@@ -137,8 +124,6 @@ Do not include any explanation, only return the JSON object. Must have at least 
 
       const response = await this.ai.generateTestCases(prompt)
       const testSuite = JSON.parse(response) as TestSuite
-
-      // Validate the response has test cases
       if (!testSuite.testCases || !Array.isArray(testSuite.testCases) || testSuite.testCases.length === 0) {
         console.error(`AI returned empty test cases for ${diff.file}`)
         return null
@@ -206,8 +191,6 @@ Do not include any explanation, only return the JSON object. Must have at least 
     content += `Message: ${commitInfo.message}\n`
     content += `Generated: ${new Date().toISOString()}\n`
     content += `Function/Feature: ${testSuite.functionName || "Main functionality"}\n\n`
-
-    // Ensure testCases is an array
     const testCases = Array.isArray(testSuite.testCases) ? testSuite.testCases : []
     
     if (testCases.length === 0) {
@@ -217,12 +200,8 @@ Do not include any explanation, only return the JSON object. Must have at least 
 
     content += `TEST CASES:\n`
     content += `=`.repeat(50) + `\n\n`
-
-    // Create table header
     content += `| Test Scenario                    | Input                           | Expected Output                 |\n`
     content += `|----------------------------------|----------------------------------|----------------------------------|\n`
-
-    // Add test cases as table rows
     testCases.forEach((testCase, index) => {
       const scenario = this.truncateText(testCase.scenario || `Test ${index + 1}`, 30)
       const input = this.truncateText(String(testCase.input || ''), 30)
@@ -233,8 +212,6 @@ Do not include any explanation, only return the JSON object. Must have at least 
 
     content += `\n\nDETAILED TEST DESCRIPTIONS:\n`
     content += `=`.repeat(50) + `\n\n`
-
-    // Add detailed descriptions
     testCases.forEach((testCase, index) => {
       content += `${index + 1}. ${testCase.scenario || `Test ${index + 1}`}\n`
       content += `   Input: ${testCase.input || 'N/A'}\n`

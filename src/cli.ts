@@ -7,9 +7,9 @@ import inquirer from "inquirer";
 import { GitService } from "./git";
 import { AIService } from "./ai";
 import { TestService } from "./test";
-import fs from "fs"
-import os from "os"
-import path from "path"
+import os from "os";
+import path from "path";
+import { ConfigService } from "./config";
 
 const program = new Command();
 
@@ -59,7 +59,6 @@ For more information, visit: https://github.com/yourusername/fynn
 `
   )
   .action(async (options) => {
-    // Show help if no options provided
     const hasOptions = Object.keys(options).length > 0;
     if (!hasOptions) {
       program.help();
@@ -70,13 +69,11 @@ For more information, visit: https://github.com/yourusername/fynn
     try {
       const git = new GitService();
 
-      // Check if we're in a git repository
       if (!(await git.isGitRepository())) {
         spinner.fail("Not a git repository");
         process.exit(1);
       }
 
-      // Check if API key is required for this operation
       const requiresApiKey =
         options.test ||
         options.summary ||
@@ -86,8 +83,11 @@ For more information, visit: https://github.com/yourusername/fynn
         options.push ||
         (!options.impact && !options.report);
 
-      if (requiresApiKey && !process.env.OPENAI_API_KEY) {
-        spinner.fail("OpenAI API key not found");
+      if (requiresApiKey) {
+        const config = new ConfigService();
+        if (!config.hasApiKey()) {
+          spinner.fail("OpenAI API key not found");
+        
         console.log(
           chalk.yellow(
             "\n💡 To use this feature, you need to set up your OpenAI API key"
@@ -102,6 +102,7 @@ For more information, visit: https://github.com/yourusername/fynn
         console.log(chalk.gray("  export OPENAI_API_KEY='your-api-key-here'"));
         process.exit(1);
       }
+    }
 
       if (options.test) {
         spinner.text = "Generating test cases...";
@@ -323,14 +324,13 @@ For more information, visit: https://github.com/yourusername/fynn
         let sinceDate: string | undefined;
 
         if (options.log !== undefined) {
-          // Handle --log flag with optional number
           if (
             typeof options.log === "string" &&
             !isNaN(Number.parseInt(options.log))
           ) {
             commitCount = Number.parseInt(options.log);
           } else if (typeof options.log === "boolean") {
-            commitCount = 10; // Default to last 10 commits
+            commitCount = 10;
           }
         }
 
@@ -341,7 +341,6 @@ For more information, visit: https://github.com/yourusername/fynn
         const changelog = await ai.generateChangelog(commitCount, sinceDate);
 
         if (changelog) {
-          // Write to CHANGELOG.md file
           const fs = await import("fs/promises");
           const path = await import("path");
 
@@ -352,13 +351,11 @@ For more information, visit: https://github.com/yourusername/fynn
           console.log(
             chalk.green(`📄 CHANGELOG.md created at: ${changelogPath}`)
           );
-
-          // Show preview of changelog
           console.log("\n" + chalk.cyan("📋 Changelog Preview:"));
           console.log(
             chalk.cyan("───────────────────────────────────────────────")
           );
-          const lines = changelog.split("\n").slice(0, 15); // Show first 15 lines
+          const lines = changelog.split("\n").slice(0, 15);
           lines.forEach((line) => {
             if (line.startsWith("#")) {
               console.log(chalk.blue.bold(line));
@@ -381,11 +378,9 @@ For more information, visit: https://github.com/yourusername/fynn
       }
 
       if (options.push) {
-        // First check if there are commits to push
         const hasCommitsToPush = await git.hasCommitsToPush();
 
         if (hasCommitsToPush) {
-          // There are commits ready to push
           spinner.text = "Pushing existing commits...";
           const pushResult = await git.push();
 
@@ -420,8 +415,6 @@ For more information, visit: https://github.com/yourusername/fynn
                 return;
               }
             }
-
-            // Auto-setup upstream
             const upstreamSpinner = ora(
               `Setting upstream and pushing to origin/${pushResult.branch}...`
             ).start();
@@ -449,12 +442,9 @@ For more information, visit: https://github.com/yourusername/fynn
             return;
           }
         }
-
-        // No commits to push, check for staged changes
         let stagedFiles = await git.getStagedFiles();
 
         if (stagedFiles.length === 0) {
-          // No staged changes, stage all changes
           spinner.text = "Staging all changes...";
           const changedFiles = await git.getAllChangedFiles();
           if (changedFiles.length === 0) {
@@ -469,10 +459,7 @@ For more information, visit: https://github.com/yourusername/fynn
             chalk.green(`✅ Found ${stagedFiles.length} already staged file(s)`)
           );
         }
-
-        // Continue with commit and push workflow
       } else {
-        // Regular workflow without --push
         let stagedFiles = await git.getStagedFiles();
 
         if (stagedFiles.length === 0 && options.commit) {
@@ -490,8 +477,6 @@ For more information, visit: https://github.com/yourusername/fynn
             chalk.green(`✅ Found ${stagedFiles.length} already staged file(s)`)
           );
         }
-
-        // Check for staged files
         if (stagedFiles.length === 0) {
           spinner.fail(
             "No staged changes found. Use --add to stage all changes or stage manually with: git add <files>"
@@ -499,8 +484,6 @@ For more information, visit: https://github.com/yourusername/fynn
           process.exit(1);
         }
       }
-
-      // Get staged files for commit message generation
       const stagedFiles = await git.getStagedFiles();
 
       spinner.text = "Analyzing staged changes...";
@@ -514,8 +497,6 @@ For more information, visit: https://github.com/yourusername/fynn
 
       if (shouldAsk) {
         spinner.succeed("Commit message generated!");
-
-        // Display the suggestion
         console.log("\n" + chalk.cyan("📝 Suggested commit message:"));
         console.log(chalk.white.bold(commitMessage));
 
@@ -567,8 +548,6 @@ For more information, visit: https://github.com/yourusername/fynn
 
         finalMessage = customMessage || commitMessage;
       }
-
-      // Commit changes
       const commitSpinner = ora("Committing changes...").start();
       await git.commit(finalMessage);
       commitSpinner.succeed(`Committed: ${finalMessage}`);
@@ -623,7 +602,6 @@ For more information, visit: https://github.com/yourusername/fynn
               );
             }
           } else {
-            // Auto-setup upstream in non-interactive mode
             const upstreamSpinner = ora(
               `Setting upstream and pushing to origin/${pushResult.branch}...`
             ).start();
@@ -665,7 +643,7 @@ program
     console.log("\n" + chalk.green("Get your OpenAI API key:"));
     console.log(chalk.gray("1. Visit: https://platform.openai.com/api-keys"));
     console.log(chalk.gray("2. Create a new API key"));
-    console.log(chalk.gray("3. Copy the key"));
+    console.log(chalk.gray("3. Copy and paste the key below"));
 
     const { apiKey } = await inquirer.prompt([
       {
@@ -673,71 +651,28 @@ program
         name: "apiKey",
         message: "Enter your OpenAI API Key:",
         mask: "*",
-        validate: (input) => input.trim() !== "" || "API key cannot be empty",
+        validate: (input) => {
+          const trimmed = input.trim();
+          if (trimmed === "") {
+            return "API key cannot be empty";
+          }
+          if (trimmed.length < 20) {
+            return "API key seems too short. Please check and try again.";
+          }
+          if (!trimmed.startsWith("sk-")) {
+            return "OpenAI API keys should start with 'sk-'. Please verify your key.";
+          }
+          return true;
+        },
       },
     ]);
 
-    // Save API key to config file (~/.yourcli/config.json)
-    const configDir = path.join(os.homedir(), ".yourcli");
-    const configPath = path.join(configDir, "config.json");
+    const config = new ConfigService();
+    config.saveApiKey(apiKey.trim());
 
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
-    }
-
-    fs.writeFileSync(configPath, JSON.stringify({ apiKey }, null, 2), "utf8");
-    console.log(chalk.green(`✅ API Key saved permanently at ${configPath}`));
-
-    // Ask if user wants to also set it as environment variable for current session / future terminals
-    const { setEnv } = await inquirer.prompt([
-      {
-        type: "confirm",
-        name: "setEnv",
-        message:
-          "Do you want to add this API key to your environment variables permanently?",
-        default: false,
-      },
-    ]);
-
-    if (setEnv) {
-      if (process.platform === "win32") {
-        // Windows - setx
-        try {
-          const { execSync } = await import("child_process");
-          execSync(`setx OPENAI_API_KEY "${apiKey}"`);
-          console.log(
-            chalk.green("✅ Environment variable added for Windows user")
-          );
-        } catch (err) {
-          console.log(
-            chalk.red("❌ Failed to set environment variable on Windows")
-          );
-        }
-      } else {
-        // macOS/Linux - append to shell profile
-        const shell = process.env.SHELL || "";
-        const exportLine = `export OPENAI_API_KEY="${apiKey}"\n`;
-        let profilePath = "";
-
-        if (shell.includes("zsh")) {
-          profilePath = path.join(os.homedir(), ".zshrc");
-        } else if (shell.includes("bash")) {
-          profilePath = path.join(os.homedir(), ".bashrc");
-        } else {
-          console.log(
-            chalk.yellow(
-              "⚠️ Could not detect shell. You may need to manually add OPENAI_API_KEY to your shell profile"
-            )
-          );
-        }
-
-        if (profilePath) {
-          fs.appendFileSync(profilePath, `\n${exportLine}`);
-          console.log(chalk.green(`✅ Added OPENAI_API_KEY to ${profilePath}`));
-        }
-      }
-    }
-
+    const configPath = path.join(os.homedir(), ".fynn", "config.json");
+    console.log(chalk.green(`✅ API Key saved successfully!`));
+    console.log(chalk.gray(`   Config location: ${configPath}`));
     console.log(
       chalk.cyan(
         "\n🎉 Setup complete! You can now use the CLI without re-entering the key."

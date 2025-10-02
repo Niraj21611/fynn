@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import {
   type GitDiff,
   type CommitSuggestion,
@@ -11,42 +11,17 @@ import { GitService } from "./git";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { ConfigService } from "./config";
 
 export class AIService {
   private model;
   private hasApiKey: boolean;
 
-  // constructor() {
-  //   const openaiKey = process.env.OPENAI_API_KEY
-
-  //   if (!openaiKey) {
-  //     console.log("❌ No OpenAI API key found!")
-  //     console.log("💡 Set your API key: export OPENAI_API_KEY='your-key'")
-  //     console.log("🔗 Get your key from: https://platform.openai.com/api-keys")
-  //     process.exit(1)
-  //   }
-
-  //   this.model = openai("gpt-4o-mini")
-  //   this.hasApiKey = true
-  // }
-
   constructor() {
-    let apiKey = process.env.OPENAI_API_KEY;
+    const config = new ConfigService();
+    const openaiKey = config.getApiKey();
 
-    // Fallback to config file if env var not set
-    if (!apiKey) {
-      const configPath = path.join(os.homedir(), ".yourcli", "config.json");
-      if (fs.existsSync(configPath)) {
-        try {
-          const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-          apiKey = config.apiKey;
-        } catch (err) {
-          console.error("❌ Failed to read API key from config file:", err);
-        }
-      }
-    }
-
-    if (!apiKey) {
+    if (!openaiKey) {
       console.log("❌ No OpenAI API key found!");
       console.log(
         "💡 Set your API key with 'fynn setup' or export OPENAI_API_KEY"
@@ -54,6 +29,9 @@ export class AIService {
       process.exit(1);
     }
 
+    const openai = createOpenAI({
+      apiKey: openaiKey,
+    });
     this.model = openai("gpt-4o-mini");
     this.hasApiKey = true;
   }
@@ -208,7 +186,7 @@ Keep it concise but informative. Write in past tense. Don't mention file names u
 
     try {
       const git = new GitService();
-      const recentCommits = await git.getRecentCommitsWithDiffs(10); // Get last 10 commits
+      const recentCommits = await git.getRecentCommitsWithDiffs(10);
 
       if (recentCommits.length === 0) {
         return [];
@@ -488,13 +466,11 @@ Parse commit messages using conventional commit format. Group similar changes. K
   }
 
   private validateSuggestion(suggestion: CommitSuggestion): CommitSuggestion {
-    // Ensure type is valid
     const validTypes = COMMIT_TYPES.map((t) => t.type);
     if (!validTypes.includes(suggestion.type)) {
       suggestion.type = "chore";
     }
 
-    // Ensure description is not too long
     if (suggestion.description.length > 50) {
       suggestion.description = suggestion.description.slice(0, 47) + "...";
     }
@@ -512,8 +488,6 @@ Parse commit messages using conventional commit format. Group similar changes. K
 
   private cleanJsonResponse(text: string): string {
     let cleaned = text.trim();
-
-    // Remove markdown code block formatting
     if (cleaned.startsWith("```json")) {
       cleaned = cleaned.replace(/^```json\s*/, "");
     }
@@ -525,21 +499,15 @@ Parse commit messages using conventional commit format. Group similar changes. K
     }
 
     cleaned = cleaned.trim();
-
-    // Find the first { or [ and corresponding closing bracket using proper bracket matching
     const firstBrace = cleaned.indexOf("{");
     const firstBracket = cleaned.indexOf("[");
-
-    // Determine if we're dealing with an object or array
     if (
       firstBrace !== -1 &&
       (firstBracket === -1 || firstBrace < firstBracket)
     ) {
-      // It's an object - find matching closing brace
       const extracted = this.extractBalancedJson(cleaned, firstBrace, "{", "}");
       if (extracted) return extracted;
     } else if (firstBracket !== -1) {
-      // It's an array - find matching closing bracket
       const extracted = this.extractBalancedJson(
         cleaned,
         firstBracket,
