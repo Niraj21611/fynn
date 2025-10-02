@@ -54,8 +54,13 @@ An intelligent CLI tool that generates meaningful commit messages using AI, foll
 **Globally (recommended):**
 
 ```bash
+# npm 
 npm install -g fynn
+
+# pnpm
 pnpm add -g fynn
+
+# yarn
 yarn global add fynn
 ```
 
