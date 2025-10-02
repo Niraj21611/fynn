@@ -109,22 +109,6 @@ npx fynn
 npx commit
 ```
 
-### Advanced Usage(Local Installation)
-
-```bash
-# Preview commit message without committing
-npx fynn --dry-run
-
-# Skip confirmation and commit immediately
-npx fynn --yes
-
-# Use a specific API key for this session
-npx fynn --api-key "your-key"
-
-# Explicitly generate a commit message
-npx fynn generate
-```
-
 ---
 
 ## How It Works

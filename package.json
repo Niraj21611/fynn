@@ -1,5 +1,5 @@
 {
-  "name": "fynn",
+  "name": "@fynn-ai/fynn",
   "version": "1.0.0",
   "description": "AI-powered commit message generator following conventional commit patterns",
   "main": "dist/index.js",
@@ -14,7 +14,7 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": ["git", "commit", "ai", "conventional-commits", "cli"],
-  "author": "Your Name",
+  "author": "Niraj Kshirsagar",
   "license": "MIT",
   "dependencies": {
     "commander": "^11.1.0",
