@@ -1,15 +1,31 @@
-# AI Commit CLI
+# Fynn - AI Commit CLI
 
-An intelligent CLI tool that generates meaningful commit messages using AI, following conventional commit patterns.
+An intelligent CLI tool that generates meaningful commit messages using AI, following conventional commit patterns. Beyond commits, Fynn offers code analysis, test generation, and developer insights powered by AI.
 
-## Features
+## ✨ Features
 
-- 🤖 **AI-Powered**: Uses OpenAI to analyze your staged changes and generate contextual commit messages
-- 📝 **Conventional Commits**: Follows the conventional commit specification
-- 🎯 **Smart Analysis**: Analyzes file changes, additions, deletions to understand the context
-- ⚡ **Easy to Use**: Simple CLI interface with sensible defaults
-- 🔧 **Customizable**: Edit generated messages before committing
-- 🚀 **Fast**: Quick setup and execution
+### Commit Management
+- 🤖 **AI-Powered Commits**: Uses OpenAI to analyze your staged changes and generate contextual commit messages
+- 📝 **Conventional Commits**: Automatically follows the conventional commit specification
+- 🎯 **Smart Workflow**: Stage, commit, and push in one command with `--push`
+- 🔧 **Interactive Mode**: Review and edit messages before committing with `--ask`
+- 👁️ **Dry Run**: Preview commit messages without committing with `--dry-run`
+
+### Code Analysis Tools
+- 🔍 **AI Code Review**: Get intelligent code review with security, performance, and best practice suggestions
+- 📊 **Impact Analysis**: Understand the risk level and complexity of your commits
+- 📝 **Commit Summaries**: Generate clear summaries of what changed in any commit
+- 🔎 **Duplicate Detection**: Find similar code patterns across multiple commits
+
+### Testing & Documentation
+- 🧪 **Test Generation**: Automatically generate test cases for your latest commit
+- 📚 **Changelog Generation**: Create professional CHANGELOG.md from commit history
+- 👥 **Developer Reports**: Track commit statistics and identify code hotspots
+
+### Performance & UX
+- ⚡ **Fast**: Quick setup and execution
+- 💡 **Helpful**: Clear error messages and setup instructions
+- 🎨 **Beautiful**: Colorful and intuitive CLI interface
 
 ## Installation
 
