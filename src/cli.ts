@@ -17,7 +17,7 @@ program
   .name("fynn")
   .description("AI-powered commit message generator")
   .version("1.0.0")
-  .option("--add", "Stage all changes before generating commit")
+  .option("--commit", "Stage and commit all changes before generating commit")
   .option("--push", "Push changes after committing (handles full workflow)")
   .option("--ask", "Ask for confirmation before committing")
   .option("--dry-run", "Generate message without committing")
@@ -47,7 +47,7 @@ program
     "after",
     `
 Examples:
-  $ fynn --add --ask          Stage changes and generate commit with confirmation
+  $ fynn --commit --ask          Stage changes and generate commit with confirmation
   $ fynn --push               Generate commit and push to remote
   $ fynn --dry-run            Preview commit message without committing
   $ fynn --test               Generate test cases for latest commit
@@ -475,7 +475,7 @@ For more information, visit: https://github.com/yourusername/fynn
         // Regular workflow without --push
         let stagedFiles = await git.getStagedFiles();
 
-        if (stagedFiles.length === 0 && options.add) {
+        if (stagedFiles.length === 0 && options.commit) {
           spinner.text = "Staging all changes...";
           const changedFiles = await git.getAllChangedFiles();
           if (changedFiles.length === 0) {
