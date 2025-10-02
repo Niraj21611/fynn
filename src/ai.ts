@@ -78,7 +78,8 @@ RULES:
 5. Don't capitalize first letter of description
 6. No period at the end
 7. If scope is obvious from files, include it
-8. If breaking change, add ! after type/scope
+8. Use correct action verb: "add", "modify", "delete" based on change type
+9. If breaking change, add ! after type/scope
 
 FILES CHANGED:
 ${diffSummary}
