@@ -37,7 +37,7 @@ An intelligent CLI tool that generates meaningful commit messages using AI, foll
 
 | Option | Description |
 |--------|-------------|
-| `--add` | Stage all changes before generating commit |
+| `--commit` | Stage and commit all changes before generating commit |
 | `--push` | Push changes after committing (handles full workflow) |
 | `--ask` | Ask for confirmation before committing |
 | `--dry-run` | Generate message without committing |
