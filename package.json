@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "AI-powered commit message generator following conventional commit patterns",
   "main": "dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Niraj21611/fynn.git"
+  },
   "bin": {
     "fynn": "dist/cli.js",
     "commit": "dist/cli.js"
