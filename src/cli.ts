@@ -59,6 +59,7 @@ For more information, visit: https://github.com/yourusername/fynn
 `
   )
   .action(async (options) => {
+    // Show help if no options provided
     const hasOptions = Object.keys(options).length > 0;
     if (!hasOptions) {
       program.help();
@@ -67,13 +68,20 @@ For more information, visit: https://github.com/yourusername/fynn
     const spinner = ora("Initializing...").start();
 
     try {
+      // Check if we're in a git repository FIRST (before spinner to avoid hanging)
       const git = new GitService();
+      const isRepo = await git.isGitRepository();
 
-      if (!(await git.isGitRepository())) {
-        spinner.fail("Not a git repository");
+      if (!isRepo) {
+        console.log(chalk.red("\n✖ Not a git repository"));
+        console.log(chalk.yellow("\n💡 Initialize a git repository first:"));
+        console.log(chalk.gray("  git init"));
+        console.log(chalk.gray("  git add ."));
+        console.log(chalk.gray('  git commit -m "Initial commit"'));
         process.exit(1);
       }
 
+      // Check if API key is required for this operation
       const requiresApiKey =
         options.test ||
         options.summary ||
@@ -87,22 +95,23 @@ For more information, visit: https://github.com/yourusername/fynn
         const config = new ConfigService();
         if (!config.hasApiKey()) {
           spinner.fail("OpenAI API key not found");
-        
-        console.log(
-          chalk.yellow(
-            "\n💡 To use this feature, you need to set up your OpenAI API key"
-          )
-        );
-        console.log(
-          chalk.cyan("\nRun: ") +
-            chalk.white("fynn setup") +
-            chalk.cyan(" for instructions")
-        );
-        console.log(chalk.gray("\nOr set it directly:"));
-        console.log(chalk.gray("  export OPENAI_API_KEY='your-api-key-here'"));
-        process.exit(1);
+          console.log(
+            chalk.yellow(
+              "\n💡 To use this feature, you need to set up your OpenAI API key"
+            )
+          );
+          console.log(
+            chalk.cyan("\nRun: ") +
+              chalk.white("fynn setup") +
+              chalk.cyan(" to save your API key")
+          );
+          console.log(chalk.gray("\nOr set it as environment variable:"));
+          console.log(
+            chalk.gray("  export OPENAI_API_KEY='your-api-key-here'")
+          );
+          process.exit(1);
+        }
       }
-    }
 
       if (options.test) {
         spinner.text = "Generating test cases...";
@@ -378,86 +387,110 @@ For more information, visit: https://github.com/yourusername/fynn
       }
 
       if (options.push) {
-        const hasCommitsToPush = await git.hasCommitsToPush();
+        const hasUncommittedChanges = await git.hasUnstagedChanges();
+        const stagedFiles = await git.getStagedFiles();
 
-        if (hasCommitsToPush) {
-          spinner.text = "Pushing existing commits...";
-          const pushResult = await git.push();
+        if (hasUncommittedChanges || stagedFiles.length > 0) {
+          spinner.text = "Uncommitted changes detected...";
+          spinner.stop();
 
-          if (pushResult.success) {
-            spinner.succeed("Changes pushed successfully!");
-            return;
-          } else if (pushResult.needsUpstream && pushResult.branch) {
-            spinner.stop();
-            console.log(chalk.yellow(`✖ Push failed: ${pushResult.error}`));
+          console.log(chalk.yellow("\n⚠️  You have uncommitted changes"));
+          console.log(
+            chalk.cyan(
+              "💡 Will stage, commit (with AI), and push in one workflow\n"
+            )
+          );
 
-            if (options.ask) {
-              const { setupUpstream } = await inquirer.prompt([
-                {
-                  type: "confirm",
-                  name: "setupUpstream",
-                  message: `No upstream branch found. Set '${pushResult.branch}' as upstream and push?`,
-                  default: true,
-                },
-              ]);
+          if (stagedFiles.length === 0) {
+            spinner.start("Staging all changes...");
+            const changedFiles = await git.getAllChangedFiles();
+            if (changedFiles.length === 0) {
+              spinner.fail("No changes found to stage or push");
+              process.exit(1);
+            }
+            await git.stageAllChanges();
+            console.log(
+              chalk.green(`✅ Staged ${changedFiles.length} file(s)`)
+            );
+          } else {
+            console.log(
+              chalk.green(
+                `✅ Found ${stagedFiles.length} already staged file(s)`
+              )
+            );
+          }
+        } else {
+          const hasCommitsToPush = await git.hasCommitsToPush();
 
-              if (!setupUpstream) {
-                console.log(
-                  chalk.yellow(
-                    "Push cancelled. You can manually set upstream later with:"
-                  )
+          if (hasCommitsToPush) {
+            spinner.text = "Pushing existing commits...";
+            const pushResult = await git.push();
+
+            if (pushResult.success) {
+              spinner.succeed("Changes pushed successfully!");
+              return;
+            } else if (pushResult.needsUpstream && pushResult.branch) {
+              spinner.stop();
+              console.log(chalk.yellow(`✖ Push failed: ${pushResult.error}`));
+
+              if (options.ask) {
+                const { setupUpstream } = await inquirer.prompt([
+                  {
+                    type: "confirm",
+                    name: "setupUpstream",
+                    message: `No upstream branch found. Set '${pushResult.branch}' as upstream and push?`,
+                    default: true,
+                  },
+                ]);
+
+                if (!setupUpstream) {
+                  console.log(
+                    chalk.yellow(
+                      "Push cancelled. You can manually set upstream later with:"
+                    )
+                  );
+                  console.log(
+                    chalk.gray(
+                      `git push --set-upstream origin ${pushResult.branch}`
+                    )
+                  );
+                  return;
+                }
+              }
+
+              const upstreamSpinner = ora(
+                `Setting upstream and pushing to origin/${pushResult.branch}...`
+              ).start();
+              try {
+                await git.pushWithUpstream(pushResult.branch);
+                upstreamSpinner.succeed(
+                  `Successfully pushed and set upstream to origin/${pushResult.branch}!`
                 );
-                console.log(
-                  chalk.gray(
-                    `git push --set-upstream origin ${pushResult.branch}`
-                  )
+                return;
+              } catch (error) {
+                upstreamSpinner.fail(
+                  `Failed to set upstream: ${
+                    error instanceof Error ? error.message : "Unknown error"
+                  }`
                 );
                 return;
               }
-            }
-            const upstreamSpinner = ora(
-              `Setting upstream and pushing to origin/${pushResult.branch}...`
-            ).start();
-            try {
-              await git.pushWithUpstream(pushResult.branch);
-              upstreamSpinner.succeed(
-                `Successfully pushed and set upstream to origin/${pushResult.branch}!`
-              );
-              return;
-            } catch (error) {
-              upstreamSpinner.fail(
-                `Failed to set upstream: ${
-                  error instanceof Error ? error.message : "Unknown error"
-                }`
+            } else {
+              spinner.fail(`Push failed: ${pushResult.error}`);
+              console.log(
+                chalk.yellow(
+                  "💡 You may need to set up a remote repository or check your permissions"
+                )
               );
               return;
             }
           } else {
-            spinner.fail(`Push failed: ${pushResult.error}`);
+            spinner.fail("No commits to push and no changes to commit");
             console.log(
-              chalk.yellow(
-                "💡 You may need to set up a remote repository or check your permissions"
-              )
+              chalk.yellow("💡 Make some changes first, then run fynn --push")
             );
             return;
           }
-        }
-        let stagedFiles = await git.getStagedFiles();
-
-        if (stagedFiles.length === 0) {
-          spinner.text = "Staging all changes...";
-          const changedFiles = await git.getAllChangedFiles();
-          if (changedFiles.length === 0) {
-            spinner.fail("No changes found to stage or push");
-            process.exit(1);
-          }
-          await git.stageAllChanges();
-          stagedFiles = await git.getStagedFiles();
-          console.log(chalk.green(`✅ Staged ${changedFiles.length} file(s)`));
-        } else {
-          console.log(
-            chalk.green(`✅ Found ${stagedFiles.length} already staged file(s)`)
-          );
         }
       } else {
         let stagedFiles = await git.getStagedFiles();

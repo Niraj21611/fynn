@@ -10,8 +10,9 @@ export class GitService {
 
   async isGitRepository(): Promise<boolean> {
     try {
-      await this.git.status()
-      return true
+      // Check if .git directory exists first (faster check)
+      const checkIsRepo = await this.git.checkIsRepo()
+      return checkIsRepo
     } catch {
       return false
     }
