@@ -55,13 +55,13 @@ An intelligent CLI tool that generates meaningful commit messages using AI, foll
 
 ```bash
 # npm 
-npm install -g fynn
+npm install -g @fynn-ai/fynn
 
 # pnpm
-pnpm add -g fynn
+pnpm add -g @fynn-ai/fynn
 
 # yarn
-yarn global add fynn
+yarn global add @fynn-ai/fynn
 ```
 
 **Without installation (via `npx`):**
