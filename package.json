@@ -1,6 +1,6 @@
 {
   "name": "@fynn-ai/fynn",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "AI-powered commit message generator following conventional commit patterns",
   "homepage": "https://fynn-ai.vercel.app/",
   "main": "dist/index.js",
